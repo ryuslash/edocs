@@ -25,6 +25,15 @@
 
 ;;; Code:
 
+(require 'package)
+(require 'help-fns)
+
+(defvar edocs-stylesheet-location "style.css"
+  "Where to find the Cascading Style Sheet for the exported docs.")
+
+(defvar edocs-generate-only-body nil
+  "Whether to genereate only the body and no header/footer info.")
+
 (defun edocs--list-symbols ()
   "Get a list of all symbols in the buffer.
 
@@ -46,29 +55,29 @@ etc."
                               (match-beginning 1) (match-end 1))
                              (buffer-substring-no-properties
                               (match-beginning 2) (match-end 2))) ls))))
-    ls))
+    (reverse ls)))
 
 (defun edocs--get-docs (type name)
   "Get docs of TYPE for symbol NAME."
   (let ((type (intern type))
         (obj (intern name)))
-    (case type
-      ((defun define-minor-mode)
-       (cons (format "%s" (or (help-function-arglist obj :preserve-names)
-                              "()"))
-             (documentation obj)))
-      ((defcustom defvar defconst defclass)
-       (documentation-property obj 'variable-documentation))
-      (defgroup
-        (documentation-property obj 'group-documentation))
-      (defgeneric
-        (mapcar (lambda (itm)
-                  (cons (format "%s" (cons (list (car (nth 2 itm))
-                                                 (car itm))
-                                           (cdr (nth 2 itm))))
-                        (nth 3 itm)))
-                (aref (plist-get (symbol-plist obj)
-                                 'eieio-method-tree) 2))))))
+    (cond
+     ((memq type '(defun define-minor-mode))
+      (cons (format "%s" (or (help-function-arglist obj :preserve-names)
+                             "()"))
+            (documentation obj)))
+     ((memq type '(defcustom defvar defconst defclass))
+      (documentation-property obj 'variable-documentation))
+     ((eql type 'defgroup)
+       (documentation-property obj 'group-documentation))
+     ((eql type 'defgeneric)
+       (mapcar (lambda (itm)
+                 (cons (format "%s" (cons (list (car (nth 2 itm))
+                                                (car itm))
+                                          (cdr (nth 2 itm))))
+                       (nth 3 itm)))
+               (aref (plist-get (symbol-plist obj)
+                                'eieio-method-tree) 2))))))
 
 (defun edocs--get-type-display (type-name)
   "Get the display text for TYPE-NAME."
@@ -87,9 +96,13 @@ etc."
   (let ((buffer (get-buffer-create "*edocs*"))
         (binfo (package-buffer-info)))
     (with-current-buffer buffer
-      (insert "<!DOCTYPE html>\n"
-              "<html><body>"
-              "<h1>" (aref binfo 0) " <small>" (aref binfo 2)
+      (unless edocs-generate-only-body
+        (insert "<!DOCTYPE html>\n"
+                "<html><head>"
+                "<link href=\"" edocs-stylesheet-location
+                "\" rel=\"stylesheet\"></head><body>"))
+      (insert "<div class=\"container\">"
+              "<h1>" (aref binfo 0) " <small>&mdash; " (aref binfo 2)
               "</small></h1><p>"
               (replace-regexp-in-string
                ";; " "" (replace-regexp-in-string
@@ -99,7 +112,7 @@ etc."
             (let ((docs (edocs--get-docs (car itm) (cdr itm))))
               (with-current-buffer buffer
                 (mapc (lambda (doc)
-                        (insert "<div>&mdash; "
+                        (insert "<div>&ndash; "
                                 (edocs--get-type-display (car itm))
                                 " <tt>" (cdr itm) "</tt> "
                                 (if (consp doc) (car doc) "")
@@ -116,8 +129,19 @@ etc."
                         docs)))))
           (edocs--list-symbols))
     (with-current-buffer buffer
-      (insert "</body></html>"))
+      (insert "</div>")
+      (unless edocs-generate-only-body
+        (insert "</body></html>")))
     (switch-to-buffer buffer)))
+
+(defun edocs-generate-batch ()
+  "Generate module docs using batch operations."
+  (mapc (lambda (file)
+          (with-current-buffer (find-file file)
+            (eval-buffer)
+            (edocs-generate)
+            (write-file (concat (file-name-sans-extension file) ".html"))))
+        command-line-args-left))
 
 (provide 'edocs)
 ;;; edocs.el ends here
