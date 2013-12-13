@@ -21,7 +21,11 @@
 
 ;;; Commentary:
 
-;; Generate formatted description of a module.
+;; Generate formatted description of a module.  Currently it makes a
+;; simple HTML export of the Commentary and all the docstrings in a
+;; file.  It is meant to be used as a batch operation, like so:
+
+;;     emacs -batch -l edocs.el -f edocs-generate-docs file.el
 
 ;;; Code:
 
