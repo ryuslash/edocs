@@ -25,18 +25,31 @@
 ;; simple HTML export of the Commentary and all the docstrings in a
 ;; file.  It is meant to be used as a batch operation, like so:
 
-;;     emacs -batch -l edocs.el -f edocs-generate-docs file.el
+;;     emacs -batch -l edocs.el -f edocs-generate-batch file.el
 
 ;;; Code:
 
-(require 'package)
 (require 'help-fns)
+(require 'lisp-mnt)
+(require 'package)
 
 (defvar edocs-stylesheet-location "style.css"
   "Where to find the Cascading Style Sheet for the exported docs.")
 
 (defvar edocs-generate-only-body nil
   "Whether to genereate only the body and no header/footer info.")
+
+(defconst edocs--symbol-type-map
+  #s(hash-table size 8 test equal
+                data ("defclass" "Class"
+                      "defconst" "Constant"
+                      "defcustom" "Customization option"
+                      "defgeneric" "Method"
+                      "defgroup" "Customization group"
+                      "define-minor-mode" "Minor mode"
+                      "defun" "Function"
+                      "defvar" "Variable"))
+  "Type -> name map for symbol types.")
 
 (defun edocs--list-symbols ()
   "Get a list of all symbols in the buffer.
@@ -85,67 +98,121 @@ etc."
 
 (defun edocs--get-type-display (type-name)
   "Get the display text for TYPE-NAME."
-  (cond
-   ((string= type-name "defun") "Function")
-   ((string= type-name "define-minor-mode") "Minor mode")
-   ((string= type-name "defgeneric") "Method")
-   ((string= type-name "defclass") "Class")
-   ((string= type-name "defcustom") "Customization option")
-   ((string= type-name "defgroup") "Customization group")
-   (t type-name)))
+  (gethash type-name edocs--symbol-type-map type-name))
+
+(defun edocs--insert-header ()
+  "Insert necessary header information into the current buffer."
+  (insert "<!DOCTYPE html>\n"
+          "<html><head>"
+          "<link href=\"" edocs-stylesheet-location
+          "\" rel=\"stylesheet\"></head><body>"))
+
+(defun edocs--insert-footer ()
+  "Insert necessary footer information into the current buffer."
+  (insert "</body></html>"))
+
+(defun edocs--insert-title (title sub)
+  "Insert a formatted TITLE and SUB into the current buffer."
+  (insert "<h1>" title " <small>&mdash; " sub "</small></h1>"))
+
+(defmacro edocs--with-tag (tag attrs &rest contents)
+  "Put insertion of TAG (possibly with ATTRS) around CONTENTS."
+  (declare (indent 2))
+  `(progn
+     (insert "<" ,tag)
+     (insert (mapconcat
+              (lambda (itm) (format " %s=%S" (car itm) (cdr itm))) ,attrs ""))
+     (insert ">")
+     ,@contents
+     (insert "</" ,tag ">")))
+
+(defun edocs--format-text (txt)
+  "Perform formatting operations on TXT."
+  (replace-regexp-in-string "\n\n" "</p><p>" txt))
+
+(defun edocs--format-commentary (cmt)
+  "Perform special commentary formatting operations on CMT."
+  (edocs--format-text
+   (replace-regexp-in-string
+    ";; " "" (replace-regexp-in-string
+              ";;; Commentary:\n+" "" cmt))))
+
+(defun edocs--format-doc (doc)
+  "Perform formatting operations on DOC or on DOC's `cdr'."
+  (edocs--format-text (if (consp doc) (cdr doc) doc)))
+
+(defun edocs--package-desc-p (package-info)
+  "Check to see if PACKAGE-INFO is a package-desc struct."
+  (and (fboundp 'package-desc-p)
+       (package-desc-p package-info)))
+
+(defun edocs--module-name (package-info)
+  "Extract the module name from PACKAGE-INFO.
+
+The location of this information seems to have changed since
+Emacs 24.3. If the function `package-desc-p' is bound and returns
+t for PACKAGE-INFO, it is the new style and we should get it
+accordingly.  Otherwise we assume we're dealing with an old-style
+package description and return the first element."
+  (if (edocs--package-desc-p package-info)
+      (symbol-name (package-desc-name package-info))
+    (aref package-info 0)))
+
+(defun edocs--module-summary (package-info)
+  "Extract a short description from PACKAGE-INFO.
+
+See the docstring for `edocs--module-name' for more information."
+  (if (edocs--package-desc-p package-info)
+      (package-desc-summary package-info)
+    (aref package-info 2)))
+
+(defun edocs--format-symbol (symbol)
+  "Format the information in SYMBOL."
+  (let ((docs (edocs--get-docs (car symbol) (cdr symbol))))
+    (mapc (lambda (doc)
+            (edocs--with-tag "div" nil
+              (insert "&ndash; "
+                      (edocs--get-type-display (car symbol))
+                      ": <tt>" (cdr symbol) "</tt> "
+                      (if (consp doc) (car doc) ""))
+              (edocs--with-tag "div" '(("class" . "docstring"))
+                (edocs--with-tag "p" nil
+                  (insert (or (edocs--format-doc doc)
+                              "Not documented."))))))
+          (if (or (not (listp docs))
+                  (not (listp (cdr docs))))
+              (list docs)
+            docs))))
 
 (defun edocs-generate ()
   "Generate nice-looking documentation for a module or file."
   (interactive)
   (let ((buffer (get-buffer-create "*edocs*"))
-        (binfo (package-buffer-info)))
+        (binfo (package-buffer-info))
+        (commentary (lm-commentary))
+        (symbols (edocs--list-symbols)))
     (with-current-buffer buffer
+      (unless edocs-generate-only-body (edocs--insert-header))
+      (edocs--with-tag "div" '(("class" . "container"))
+        (edocs--insert-title (edocs--module-name binfo)
+                             (edocs--module-summary binfo))
+        (edocs--with-tag "p" nil
+          (insert (edocs--format-commentary commentary)))
+        (mapc #'edocs--format-symbol symbols))
       (unless edocs-generate-only-body
-        (insert "<!DOCTYPE html>\n"
-                "<html><head>"
-                "<link href=\"" edocs-stylesheet-location
-                "\" rel=\"stylesheet\"></head><body>"))
-      (insert "<div class=\"container\">"
-              "<h1>" (aref binfo 0) " <small>&mdash; " (aref binfo 2)
-              "</small></h1><p>"
-              (replace-regexp-in-string
-               ";; " "" (replace-regexp-in-string
-                         ";;; Commentary:\n+" "" (aref binfo 4)))
-              "</p>"))
-    (mapc (lambda (itm)
-            (let ((docs (edocs--get-docs (car itm) (cdr itm))))
-              (with-current-buffer buffer
-                (mapc (lambda (doc)
-                        (insert "<div>&ndash; "
-                                (edocs--get-type-display (car itm))
-                                " <tt>" (cdr itm) "</tt> "
-                                (if (consp doc) (car doc) "")
-                                "<p class=\"docstring\">"
-                                (or (if (consp doc)
-                                        (replace-regexp-in-string
-                                         "\n\n" "</p><p>" (cdr doc))
-                                      (replace-regexp-in-string
-                                       "\n\n" "</p><p>" doc))
-                                    "Not documented.") "</p></div>"))
-                      (if (or (not (listp docs))
-                              (not (listp (cdr docs))))
-                          (list docs)
-                        docs)))))
-          (edocs--list-symbols))
-    (with-current-buffer buffer
-      (insert "</div>")
-      (unless edocs-generate-only-body
-        (insert "</body></html>")))
+        (edocs--insert-footer)))
     (switch-to-buffer buffer)))
+
+(defun edocs--generate-batch-1 (file)
+  "Generate docs for FILE."
+  (with-current-buffer (find-file file)
+    (eval-buffer)
+    (edocs-generate)
+    (write-file (concat (file-name-sans-extension file) ".html"))))
 
 (defun edocs-generate-batch ()
   "Generate module docs using batch operations."
-  (mapc (lambda (file)
-          (with-current-buffer (find-file file)
-            (eval-buffer)
-            (edocs-generate)
-            (write-file (concat (file-name-sans-extension file) ".html"))))
-        command-line-args-left))
+  (mapc #'edocs--generate-batch-1 command-line-args-left))
 
 (provide 'edocs)
 ;;; edocs.el ends here
