@@ -120,7 +120,7 @@ etc."
                                 (edocs--get-type-display (car itm))
                                 " <tt>" (cdr itm) "</tt> "
                                 (if (consp doc) (car doc) "")
-                                "<p>"
+                                "<p class=\"docstring\">"
                                 (or (if (consp doc)
                                         (replace-regexp-in-string
                                          "\n\n" "</p><p>" (cdr doc))
