@@ -129,7 +129,11 @@ etc."
 
 (defun edocs--format-text (txt)
   "Perform formatting operations on TXT."
-  (org-export-string-as txt 'html t))
+  (let ((org-export-with-toc nil)
+        (org-export-with-section-numbers nil))
+    (org-export-string-as
+     (replace-regexp-in-string "`\\([^']+\\)'" "~\\1~" txt)
+     'html t)))
 
 (defun edocs--format-commentary (cmt)
   "Perform special commentary formatting operations on CMT."
