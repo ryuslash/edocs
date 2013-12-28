@@ -171,10 +171,13 @@ See the docstring for `edocs--module-name' for more information."
   (let ((docs (edocs--get-docs (car symbol) (cdr symbol))))
     (mapc (lambda (doc)
             (edocs--with-tag "div" nil
-              (insert "&ndash; "
-                      (edocs--get-type-display (car symbol))
-                      ": <tt>" (cdr symbol) "</tt> "
-                      (if (consp doc) (car doc) ""))
+              (insert "&ndash; ")
+              (edocs--with-tag "strong" nil
+                (insert (edocs--get-type-display (car symbol))))
+              (insert ": ")
+              (edocs--with-tag "tt" nil
+                (insert (cdr symbol)))
+              (insert " " (if (consp doc) (car doc) ""))
               (edocs--with-tag "div" '(("class" . "docstring"))
                 (edocs--with-tag "p" nil
                   (insert (or (edocs--format-doc doc)
