@@ -1,4 +1,4 @@
-;;; edocs.el --- Extract documentation from file(s)
+;;; edocs.el --- Extract and format documentation from file(s)
 
 ;; Copyright (C) 2013  Tom Willemse
 
@@ -25,12 +25,13 @@
 ;; simple HTML export of the Commentary and all the docstrings in a
 ;; file.  It is meant to be used as a batch operation, like so:
 
-;;     emacs -batch -l edocs.el -f edocs-generate-batch file.el
+;; : emacs -batch -l edocs.el -f edocs-generate-batch file.el
 
 ;;; Code:
 
 (require 'help-fns)
 (require 'lisp-mnt)
+(require 'ox-html)
 (require 'package)
 
 (defvar edocs-stylesheet-location "style.css"
@@ -128,7 +129,7 @@ etc."
 
 (defun edocs--format-text (txt)
   "Perform formatting operations on TXT."
-  (replace-regexp-in-string "\n\n" "</p><p>" txt))
+  (org-export-string-as txt 'html t))
 
 (defun edocs--format-commentary (cmt)
   "Perform special commentary formatting operations on CMT."
