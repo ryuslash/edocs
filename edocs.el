@@ -210,6 +210,7 @@ See the docstring for `edocs--module-name' for more information."
                              (edocs--module-summary binfo))
         (edocs--with-tag "p" nil
           (insert (edocs--format-commentary commentary)))
+        (insert "<h2>API</h2>")
         (mapc #'edocs--format-symbol symbols))
       (unless edocs-generate-only-body
         (edocs--insert-footer)))
