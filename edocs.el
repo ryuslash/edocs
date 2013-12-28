@@ -40,6 +40,9 @@
 (defvar edocs-generate-only-body nil
   "Whether to genereate only the body and no header/footer info.")
 
+(defvar edocs-private-regexp "--"
+  "Regular expression to identify private parts of a module's API.")
+
 (defconst edocs--symbol-type-map
   #s(hash-table size 8 test equal
                 data ("defclass" "Class"
@@ -69,10 +72,12 @@ etc."
                        " "
                        (group (1+ (not (any space ?\n ?\)))))))
               nil :noerror)
-        (setq ls (cons (cons (buffer-substring-no-properties
-                              (match-beginning 1) (match-end 1))
-                             (buffer-substring-no-properties
-                              (match-beginning 2) (match-end 2))) ls))))
+        (let ((type (buffer-substring-no-properties
+                     (match-beginning 1) (match-end 1)))
+              (name (buffer-substring-no-properties
+                     (match-beginning 2) (match-end 2))))
+          (unless (string-match edocs-private-regexp name)
+            (setq ls (cons (cons type name) ls))))))
     (reverse ls)))
 
 (defun edocs--get-docs (type name)
