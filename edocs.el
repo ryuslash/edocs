@@ -166,6 +166,13 @@ See the docstring for `edocs--module-name' for more information."
       (package-desc-summary package-info)
     (aref package-info 2)))
 
+(defun edocs--normalize (docs)
+  "Make sure DOCS is a properly formatted list."
+  (if (or (not (listp docs))
+          (not (listp (cdr docs))))
+      (list docs)
+    docs))
+
 (defun edocs--format-symbol (symbol)
   "Format the information in SYMBOL."
   (let ((docs (edocs--get-docs (car symbol) (cdr symbol))))
@@ -182,10 +189,7 @@ See the docstring for `edocs--module-name' for more information."
                 (edocs--with-tag "p" nil
                   (insert (or (edocs--format-doc doc)
                               "Not documented."))))))
-          (if (or (not (listp docs))
-                  (not (listp (cdr docs))))
-              (list docs)
-            docs))))
+          (edocs--normalize docs))))
 
 (defun edocs-generate ()
   "Generate nice-looking documentation for a module or file."
