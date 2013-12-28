@@ -34,6 +34,9 @@
 (require 'ox-html)
 (require 'package)
 
+(eval-when-compile
+  (require 'cl-macs))
+
 (defvar edocs-stylesheet-location "style.css"
   "Where to find the Cascading Style Sheet for the exported docs.")
 
@@ -124,32 +127,52 @@ etc."
 (defmacro edocs--with-tag (tag attrs &rest contents)
   "Put insertion of TAG (possibly with ATTRS) around CONTENTS."
   (declare (indent 2))
-  `(progn
-     (insert "<" ,tag)
-     (insert (mapconcat
-              (lambda (itm) (format " %s=%S" (car itm) (cdr itm))) ,attrs ""))
-     (insert ">")
-     ,@contents
-     (insert "</" ,tag ">")))
+  (let ((tag-sym (cl-gensym))
+        (attrs-sym (cl-gensym)))
+    `(let ((,tag-sym ,tag)
+           (,attrs-sym ,attrs))
+       (insert "<" ,tag-sym)
+       (insert (mapconcat
+                (lambda (itm)
+                  (format " %s=%S" (car itm) (cdr itm)))
+                ,attrs-sym ""))
+       (insert ">")
+       ,@contents
+       (insert "</" ,tag-sym ">"))))
 
-(defun edocs--format-text (txt)
-  "Perform formatting operations on TXT."
+(defun edocs--format-text (txt known-symbols)
+  "Perform formatting operations on TXT.
+
+KNOWN-SYMBOLS is used for referencing symbols found in other
+parts of the module."
   (let ((org-export-with-toc nil)
         (org-export-with-section-numbers nil))
     (org-export-string-as
-     (replace-regexp-in-string "`\\([^']+\\)'" "~\\1~" txt)
+     (replace-regexp-in-string
+      "`\\([^']+\\)'"
+      (lambda (match)
+        (if (member (substring match 1 -1) known-symbols)
+            "@@html:<a href=\"#\\1\"><code>@@\\1@@html:</code></a>@@"
+          "~\\1~"))
+      txt)
      'html t)))
 
-(defun edocs--format-commentary (cmt)
-  "Perform special commentary formatting operations on CMT."
+(defun edocs--format-commentary (cmt known-symbols)
+  "Perform special commentary formatting operations on CMT.
+
+KNOWN-SYMBOLS is used for referencing symbols found in other
+parts of the module."
   (edocs--format-text
    (replace-regexp-in-string
     ";; " "" (replace-regexp-in-string
-              ";;; Commentary:\n+" "" cmt))))
+              ";;; Commentary:\n+" "" cmt)) known-symbols))
 
-(defun edocs--format-doc (doc)
-  "Perform formatting operations on DOC or on DOC's `cdr'."
-  (edocs--format-text (if (consp doc) (cdr doc) doc)))
+(defun edocs--format-doc (doc known-symbols)
+  "Perform formatting operations on DOC or on DOC's `cdr'.
+
+KNOWN-SYMBOLS is used for referencing symbols found in other
+parts of the module."
+  (edocs--format-text (if (consp doc) (cdr doc) doc) known-symbols))
 
 (defun edocs--package-desc-p (package-info)
   "Check to see if PACKAGE-INFO is a package-desc struct."
@@ -183,40 +206,49 @@ See the docstring for `edocs--module-name' for more information."
       (list docs)
     docs))
 
-(defun edocs--format-symbol (symbol)
-  "Format the information in SYMBOL."
-  (let ((docs (edocs--get-docs (car symbol) (cdr symbol))))
+(defun edocs--format-symbol (symbol known-symbols)
+  "Format the information in SYMBOL.
+
+KNOWN-SYMBOLS is used for referencing symbols found in other
+parts of the module."
+  (let* ((type (car symbol))
+         (name (cdr symbol))
+         (docs (edocs--get-docs type name)))
     (mapc (lambda (doc)
             (edocs--with-tag "div" nil
               (insert "&ndash; ")
               (edocs--with-tag "strong" nil
-                (insert (edocs--get-type-display (car symbol))))
+                (insert (edocs--get-type-display type)))
               (insert ": ")
               (edocs--with-tag "tt" nil
-                (insert (cdr symbol)))
+                (edocs--with-tag "a" `(("name" . ,name)
+                                       ("href" . ,(concat "#" name)))
+                  (insert name)))
               (insert " " (if (consp doc) (car doc) ""))
               (edocs--with-tag "div" '(("class" . "docstring"))
                 (edocs--with-tag "p" nil
-                  (insert (or (edocs--format-doc doc)
+                  (insert (or (edocs--format-doc doc known-symbols)
                               "Not documented."))))))
           (edocs--normalize docs))))
 
 (defun edocs-generate ()
   "Generate nice-looking documentation for a module or file."
   (interactive)
-  (let ((buffer (get-buffer-create "*edocs*"))
-        (binfo (package-buffer-info))
-        (commentary (lm-commentary))
-        (symbols (edocs--list-symbols)))
+  (let* ((buffer (get-buffer-create "*edocs*"))
+         (binfo (package-buffer-info))
+         (commentary (lm-commentary))
+         (symbol-specs (edocs--list-symbols))
+         (symbols (mapcar #'cdr symbol-specs)))
     (with-current-buffer buffer
       (unless edocs-generate-only-body (edocs--insert-header))
       (edocs--with-tag "div" '(("class" . "container"))
         (edocs--insert-title (edocs--module-name binfo)
                              (edocs--module-summary binfo))
         (edocs--with-tag "p" nil
-          (insert (edocs--format-commentary commentary)))
+          (insert (edocs--format-commentary commentary symbols)))
         (insert "<h2>API</h2>")
-        (mapc #'edocs--format-symbol symbols))
+        (mapc (lambda (spec) (edocs--format-symbol spec symbols))
+              symbol-specs))
       (unless edocs-generate-only-body
         (edocs--insert-footer)))
     (switch-to-buffer buffer)))
