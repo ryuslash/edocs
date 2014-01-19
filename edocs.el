@@ -250,7 +250,7 @@ parts of the module."
                                        ("href" . ,(concat "#" name)))
                   (insert name)))
               (insert " " (if (consp doc) (car doc) ""))
-              (edocs--with-tag "div" '(("class" . "docstring"))
+              (edocs--with-tag "blockquote" '(("class" . "docstring"))
                 (insert (or (edocs--format-doc doc known-symbols)
                             "Not documented.")))))
           (edocs--normalize docs))))
