@@ -251,9 +251,8 @@ parts of the module."
                   (insert name)))
               (insert " " (if (consp doc) (car doc) ""))
               (edocs--with-tag "div" '(("class" . "docstring"))
-                (edocs--with-tag "p" nil
-                  (insert (or (edocs--format-doc doc known-symbols)
-                              "Not documented."))))))
+                (insert (or (edocs--format-doc doc known-symbols)
+                            "Not documented.")))))
           (edocs--normalize docs))))
 
 (defun edocs-generate ()
@@ -275,8 +274,7 @@ into a buffer called `*edocs*' and switches to that buffer."
       (edocs--with-tag "div" '(("class" . "container"))
         (edocs--insert-title (edocs--module-name binfo)
                              (edocs--module-summary binfo))
-        (edocs--with-tag "p" nil
-          (insert (edocs--format-commentary commentary symbols)))
+        (insert (edocs--format-commentary commentary symbols))
         (insert "<h2>API</h2>")
         (mapc (lambda (spec) (edocs--format-symbol spec symbols))
               symbol-specs))
