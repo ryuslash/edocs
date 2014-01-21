@@ -189,8 +189,8 @@ KNOWN-SYMBOLS is used for referencing symbols found in other
 parts of the module."
   (edocs--format-text
    (replace-regexp-in-string
-    ";; " "" (replace-regexp-in-string
-              ";;; Commentary:\n+" "" cmt)) known-symbols))
+    "^;; " "" (replace-regexp-in-string
+               ";;; Commentary:\n+" "" cmt)) known-symbols))
 
 (defun edocs--format-doc (doc known-symbols)
   "Perform formatting operations on DOC or on DOC's `cdr'.
