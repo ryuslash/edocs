@@ -93,21 +93,19 @@ etc."
   (let (ls)
     (save-excursion
       (goto-char (point-min))
-      (while (re-search-forward
-              (rx (and bol ?\(
-                       (group (or "defun" "defgroup" "defcustom" "defvar"
-                                  "defclass" "defgeneric" "defconst"
-                                  "define-minor-mode" "defface"))
-                       " "
-                       (group (1+ (not (any space ?\n ?\)))))))
-              nil :noerror)
-        (let ((type (buffer-substring-no-properties
-                     (match-beginning 1) (match-end 1)))
-              (name (buffer-substring-no-properties
-                     (match-beginning 2) (match-end 2))))
-          (unless (string-match edocs-private-regexp name)
-            (setq ls (cons (cons type name) ls))))))
-    (reverse ls)))
+      (condition-case nil
+          (while t
+            (let ((expr (read (current-buffer))))
+              (when (member (car expr)
+                            '(defun defgroup defcustom defvar
+                                    defclass defgeneric defconst
+                                    define-minor-mode defface))
+                (let ((type (symbol-name (car expr)))
+                      (name (symbol-name (cadr expr))))
+                  (unless (string-match edocs-private-regexp name)
+                    (push (cons type name) ls))))))
+        (end-of-file nil))
+      (reverse ls))))
 
 (defun edocs--get-docs (type name)
   "Get docs of TYPE for symbol NAME."
