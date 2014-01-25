@@ -76,6 +76,7 @@ and are not meant to be used outside the module.  The default is
                 data ("defclass" "Class"
                       "defconst" "Constant"
                       "defcustom" "Customization option"
+                      "defface" "Face"
                       "defgeneric" "Method"
                       "defgroup" "Customization group"
                       "define-minor-mode" "Minor mode"
@@ -96,7 +97,7 @@ etc."
               (rx (and bol ?\(
                        (group (or "defun" "defgroup" "defcustom" "defvar"
                                   "defclass" "defgeneric" "defconst"
-                                  "define-minor-mode"))
+                                  "define-minor-mode" "defface"))
                        " "
                        (group (1+ (not (any space ?\n ?\)))))))
               nil :noerror)
@@ -120,7 +121,9 @@ etc."
      ((memq type '(defcustom defvar defconst defclass))
       (documentation-property obj 'variable-documentation))
      ((eql type 'defgroup)
-       (documentation-property obj 'group-documentation))
+      (documentation-property obj 'group-documentation))
+     ((eql type 'defface)
+      (documentation-property obj 'face-documentation))
      ((eql type 'defgeneric)
        (mapcar (lambda (itm)
                  (cons (format "%s" (cons (list (car (nth 2 itm))
