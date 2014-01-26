@@ -281,7 +281,7 @@ into a buffer called `*edocs*' and switches to that buffer."
          (binfo (package-buffer-info))
          (commentary (lm-commentary))
          (symbol-specs (edocs--list-symbols))
-         (symbols (mapcar #'edocs-symbol-type symbol-specs)))
+         (symbols (mapcar #'edocs-symbol-name symbol-specs)))
     (with-current-buffer buffer
       (unless edocs-generate-only-body (edocs--insert-header))
       (edocs--with-tag "div" '(("class" . "container"))
