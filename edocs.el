@@ -99,7 +99,7 @@ and are not meant to be used outside the module.  The default is
       (let ((doc (nth 2 expr)))
         (when (stringp doc) doc)))
     (defclass
-      (let ((doc (or (plist-git expr :documentation)
+      (let ((doc (or (plist-get expr :documentation)
                      (nth 4 expr))))
         (when (stringp doc) doc)))
     (defmethod
