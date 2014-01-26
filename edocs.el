@@ -132,11 +132,12 @@ etc."
                                     defclass defgeneric defconst
                                     define-minor-mode defface))
                 (let ((type (symbol-name (car expr)))
-                      (name (symbol-name (cadr expr))))
-                  (unless (string-match edocs-private-regexp name)
+                      (name (symbol-name (cadr expr)))
+                      (docs (edocs--get-doc expr)))
+                  (unless (or (string-match edocs-private-regexp name)
+                              (not docs))
                     (push (make-edocs-symbol
-                           :name name :type type
-                           :doc (edocs--get-doc expr)
+                           :name name :type type :doc docs
                            :args (edocs--get-arg-list expr)) ls))))))
         (end-of-file nil))
       (reverse ls))))
