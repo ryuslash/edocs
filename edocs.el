@@ -141,30 +141,6 @@ etc."
         (end-of-file nil))
       (reverse ls))))
 
-(defun edocs--get-docs (type name)
-  "Get docs of TYPE for symbol NAME."
-  (let ((type (intern type))
-        (obj (intern name)))
-    (cond
-     ((memq type '(defun define-minor-mode))
-      (cons (format "%s" (or (help-function-arglist obj :preserve-names)
-                             "()"))
-            (documentation obj)))
-     ((memq type '(defcustom defvar defconst defclass))
-      (documentation-property obj 'variable-documentation))
-     ((eql type 'defgroup)
-      (documentation-property obj 'group-documentation))
-     ((eql type 'defface)
-      (documentation-property obj 'face-documentation))
-     ((eql type 'defgeneric)
-       (mapcar (lambda (itm)
-                 (cons (format "%s" (cons (list (car (nth 2 itm))
-                                                (car itm))
-                                          (cdr (nth 2 itm))))
-                       (nth 3 itm)))
-               (aref (plist-get (symbol-plist obj)
-                                'eieio-method-tree) 2))))))
-
 (defun edocs--get-type-display (type-name)
   "Get the display text for TYPE-NAME."
   (gethash type-name edocs--symbol-type-map type-name))
