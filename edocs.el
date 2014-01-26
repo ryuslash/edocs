@@ -84,6 +84,37 @@ and are not meant to be used outside the module.  The default is
                       "defvar" "Variable"))
   "Type -> name map for symbol types.")
 
+(defun edocs--get-doc (expr)
+  "Get a docstring from EXPR."
+  (cl-case (car expr)
+    ((defun defcustom defgroup defface)
+     (let ((doc (nth 3 expr)))
+       (when (stringp doc) doc)))
+    ((defvar defconst defgeneric)
+      (let ((doc (car (last expr))))
+        (when (and (= (length expr) 4)
+                   (stringp doc))
+          doc)))
+    (define-minor-mode
+      (let ((doc (nth 2 expr)))
+        (when (stringp doc) doc)))
+    (defclass
+      (let ((doc (or (plist-git expr :documentation)
+                     (nth 4 expr))))
+        (when (stringp doc) doc)))
+    (defmethod
+      (let ((doc1 (nth 3 expr))
+            (doc2 (nth 4 expr)))
+        (or (and (stringp doc1) doc1)
+            (and (stringp doc2) doc2))))))
+
+(defun edocs--get-arg-list (expr)
+  "Get argument list from EXPR if possible."
+  (when (eql (car expr) 'defun)
+    (format "%s" (or (nth 2 expr) "()"))))
+
+(cl-defstruct edocs-symbol name type doc args)
+
 (defun edocs--list-symbols ()
   "Get a list of all symbols in the buffer.
 
@@ -103,7 +134,10 @@ etc."
                 (let ((type (symbol-name (car expr)))
                       (name (symbol-name (cadr expr))))
                   (unless (string-match edocs-private-regexp name)
-                    (push (cons type name) ls))))))
+                    (push (make-edocs-symbol
+                           :name name :type type
+                           :doc (edocs--get-doc expr)
+                           :args (edocs--get-arg-list expr)) ls))))))
         (end-of-file nil))
       (reverse ls))))
 
@@ -238,9 +272,10 @@ See the docstring for `edocs--module-name' for more information."
 
 KNOWN-SYMBOLS is used for referencing symbols found in other
 parts of the module."
-  (let* ((type (car symbol))
-         (name (cdr symbol))
-         (docs (edocs--get-docs type name)))
+  (let ((type (edocs-symbol-type symbol))
+        (name (edocs-symbol-name symbol))
+        (docs (edocs-symbol-doc symbol))
+        (args (edocs-symbol-args symbol)))
     (mapc (lambda (doc)
             (edocs--with-tag "div" nil
               (insert "&ndash; ")
@@ -251,7 +286,7 @@ parts of the module."
                 (edocs--with-tag "a" `(("name" . ,name)
                                        ("href" . ,(concat "#" name)))
                   (insert name)))
-              (insert " " (if (consp doc) (car doc) ""))
+              (insert " " (or args ""))
               (edocs--with-tag "blockquote" '(("class" . "docstring"))
                 (insert (or (edocs--format-doc doc known-symbols)
                             "Not documented.")))))
@@ -270,7 +305,7 @@ into a buffer called `*edocs*' and switches to that buffer."
          (binfo (package-buffer-info))
          (commentary (lm-commentary))
          (symbol-specs (edocs--list-symbols))
-         (symbols (mapcar #'cdr symbol-specs)))
+         (symbols (mapcar #'edocs-symbol-type symbol-specs)))
     (with-current-buffer buffer
       (unless edocs-generate-only-body (edocs--insert-header))
       (edocs--with-tag "div" '(("class" . "container"))
@@ -287,7 +322,6 @@ into a buffer called `*edocs*' and switches to that buffer."
 (defun edocs--generate-batch-1 (file)
   "Generate docs for FILE."
   (with-current-buffer (find-file file)
-    (eval-buffer)
     (edocs-generate)
     (write-file (concat (file-name-sans-extension file) ".html"))))
 
