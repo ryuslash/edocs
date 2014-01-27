@@ -212,15 +212,16 @@ KNOWN-SYMBOLS is used for referencing symbols found in other
 parts of the module."
   (let ((org-export-with-toc nil)
         (org-export-with-section-numbers nil))
-    (org-export-string-as
-     (replace-regexp-in-string
-      "`\\([^']+\\)'"
-      (lambda (match)
-        (if (member (substring match 1 -1) known-symbols)
-            "@@html:<a href=\"#\\1\"><code>@@\\1@@html:</code></a>@@"
-          "~\\1~"))
-      txt)
-     'html t)))
+    (edocs--with-tag "div" '(("class" . "container"))
+      (org-export-string-as
+       (replace-regexp-in-string
+        "`\\([^']+\\)'"
+        (lambda (match)
+          (if (member (substring match 1 -1) known-symbols)
+              "@@html:<a href=\"#\\1\"><code>@@\\1@@html:</code></a>@@"
+            "~\\1~"))
+        txt)
+       'html t))))
 
 (defmethod edocs--export-format-text ((exporter edocs-ascii-exporter)
                                       txt known-symbols)
@@ -243,13 +244,12 @@ parts of the module."
 
 KNOWN-SYMBOLS is used for referencing symbols found in other
 parts of the module."
-  (edocs--with-tag "div" '(("class" . "container"))
-    (edocs--export-format-text
-     exporter
-     (replace-regexp-in-string
-      ";" "*" (replace-regexp-in-string
-               "^;; " "" (replace-regexp-in-string
-                          ";;; Commentary:\n+" "" cmt))) known-symbols)))
+  (edocs--export-format-text
+   exporter
+   (replace-regexp-in-string
+    ";" "*" (replace-regexp-in-string
+             "^;; " "" (replace-regexp-in-string
+                        ";;; Commentary:\n+" "" cmt))) known-symbols))
 
 (defun edocs--format-doc (exporter doc known-symbols)
   "Make EXPORTER perform formatting operations on DOC or on DOC's `cdr'.
