@@ -213,15 +213,16 @@ parts of the module."
   (let ((org-export-with-toc nil)
         (org-export-with-section-numbers nil))
     (edocs--with-tag "div" '(("class" . "container"))
-      (org-export-string-as
-       (replace-regexp-in-string
-        "`\\([^']+\\)'"
-        (lambda (match)
-          (if (member (substring match 1 -1) known-symbols)
-              "@@html:<a href=\"#\\1\"><code>@@\\1@@html:</code></a>@@"
-            "~\\1~"))
-        txt)
-       'html t))))
+      (insert
+       (org-export-string-as
+        (replace-regexp-in-string
+         "`\\([^']+\\)'"
+         (lambda (match)
+           (if (member (substring match 1 -1) known-symbols)
+               "@@html:<a href=\"#\\1\"><code>@@\\1@@html:</code></a>@@"
+             "~\\1~"))
+         txt)
+        'html t)))))
 
 (defmethod edocs--export-format-text ((exporter edocs-ascii-exporter)
                                       txt known-symbols)
@@ -352,7 +353,7 @@ into a buffer called `*edocs*' and switches to that buffer."
       (edocs--export-insert-title exporter
                                   (edocs--module-name binfo)
                                   (edocs--module-summary binfo))
-      (insert (edocs--format-commentary exporter commentary symbols))
+      (edocs--format-commentary exporter commentary symbols)
       (edocs--export-insert-header exporter 2 "API")
       (mapc (lambda (spec) (edocs--format-symbol exporter spec symbols))
             symbol-specs)
