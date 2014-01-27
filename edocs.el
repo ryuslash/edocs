@@ -242,12 +242,13 @@ parts of the module."
 
 KNOWN-SYMBOLS is used for referencing symbols found in other
 parts of the module."
-  (edocs--export-format-text
-   exporter
-   (replace-regexp-in-string
-    ";" "*" (replace-regexp-in-string
-             "^;; " "" (replace-regexp-in-string
-                        ";;; Commentary:\n+" "" cmt))) known-symbols))
+  (edocs--with-tag "div" '(("class" . "container"))
+    (edocs--export-format-text
+     exporter
+     (replace-regexp-in-string
+      ";" "*" (replace-regexp-in-string
+               "^;; " "" (replace-regexp-in-string
+                          ";;; Commentary:\n+" "" cmt))) known-symbols)))
 
 (defun edocs--format-doc (exporter doc known-symbols)
   "Make EXPORTER perform formatting operations on DOC or on DOC's `cdr'.
