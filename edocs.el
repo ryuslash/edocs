@@ -295,7 +295,7 @@ See the docstring for `edocs--module-name' for more information."
 (defmethod edocs--export-insert-definition
   ((exporter edocs-html-exporter) type name args doc known-symbols)
   "Insert definition."
-  (edocs--with-tag "div" nil
+  (edocs--with-tag "div" '(("class" . "container"))
     (insert "&ndash; ")
     (edocs--with-tag "strong" nil
       (insert (edocs--get-type-display type)))
