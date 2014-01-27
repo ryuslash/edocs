@@ -1,0 +1,86 @@
+edocs --- Extract and format documentation from file(s)
+
+Generate formatted description of a module.  Currently it makes a
+simple HTML export of the Commentary and all the docstrings in a
+file.  It is meant to be used as a batch operation, like so:
+
+: emacs -batch -l edocs.el -f edocs-generate-batch file.el
+
+Each paragraph of text is exported using `org-mode', currently
+requiring at least org version 8.
+
+There is `edocs-generate' which can be used to generate a buffer of
+the HTML output of the module it's run in interactively, but it is
+not meant as the main entry-point for edocs.  The function
+`edocs-generate-batch' is the main entry-point of edocs, it is
+supposed to be run as a batch procedure as shown above.
+
+== API
+
+-- Variable: edocs-stylesheet-location 
+
+The location of the CSS used by the exported HTML.
+
+By default it uses `style.css'.  This can be changed to any value
+which can be used as the `href' attribute of a `style' tag as it
+is placed verbatim in one.
+
+-- Variable: edocs-generate-only-body 
+
+Whether to generate only the body and no header/footer info.
+
+In case the output of edocs is to be embedded into some other
+HTML or similar file this option can be changed so that no HTML
+header of footer tags are output.  Any non-nil value will
+suppress these tags.  The default is nil.
+
+-- Variable: edocs-private-regexp 
+
+Regular expression to identify private parts of a module's API.
+
+Some modules (such as this one) differentiate between public and
+private parts of the API.  This regular expression is used to
+identify symbols that are supposed to be private to the module,
+and are not meant to be used outside the module.  The default is
+`--', which matches any symbol with two hyphens such as
+`edocs--symbol-type-map'.
+
+-- Variable: edocs-exporter 
+
+The exporter to use when exporting docs.
+
+-- Class: edocs-ascii-exporter 
+
+An exporter that produces ascii text.
+
+-- Class: edocs-html-exporter 
+
+An exporter that produces html text.
+
+-- Function: edocs-generate (&optional exporter)
+
+Generate nice-looking documentation for a module or file.
+
+Markup is handled by `org-mode' exporting functions.  This
+command is used both as an interactive command to test the output
+of this module and called by the `edocs-generate-batch' function
+to generate the actual output.  This command outputs its result
+into a buffer called `*edocs*' and switches to that buffer.
+
+-- Function: edocs-generate-batch ()
+
+Generate module docs as a batch operation.
+
+This function maps over `command-line-args-left' and tries to
+export the documentation for each file to a file with the same
+name, except for the extension replaced with `.html'.  This
+function uses the `edocs-generate' command to actually generate
+the HTML.
+
+Options which affect the export of module documentation (such as
+`edocs-stylesheet-location') can be changed using the `-eval'
+command line argument to Emacs.  For example:
+
+: emacs -batch -l edocs.el -eval "(setq edocs-generate-only-body t)" \
+:     -f edocs-generate-batch file.el
+
