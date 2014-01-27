@@ -38,6 +38,7 @@
 
 ;;; Code:
 
+(require 'eieio)
 (require 'help-fns)
 (require 'lisp-mnt)
 (require 'ox-html)
@@ -71,6 +72,9 @@ and are not meant to be used outside the module.  The default is
 `--', which matches any symbol with two hyphens such as
 `edocs--symbol-type-map'.")
 
+(defvar edocs-exporter 'edocs-html-exporter
+  "The exporter to use when exporting docs.")
+
 (defconst edocs--symbol-type-map
   #s(hash-table size 8 test equal
                 data ("defclass" "Class"
@@ -83,6 +87,14 @@ and are not meant to be used outside the module.  The default is
                       "defun" "Function"
                       "defvar" "Variable"))
   "Type -> name map for symbol types.")
+
+(defclass edocs-ascii-exporter ()
+  ((extension :reader exporter-extension :initform ".txt"))
+  :documentation "An exporter that produces ascii text.")
+
+(defclass edocs-html-exporter ()
+  ((extension :reader exporter-extension :initform ".html"))
+  :documentation "An exporter that produces html text.")
 
 (defun edocs--get-doc (expr)
   "Get a docstring from EXPR."
@@ -146,20 +158,35 @@ etc."
   "Get the display text for TYPE-NAME."
   (gethash type-name edocs--symbol-type-map type-name))
 
-(defun edocs--insert-header ()
-  "Insert necessary header information into the current buffer."
+(defmethod edocs--export-insert-headers ((exporter edocs-html-exporter))
+  "Insert an HTML header."
   (insert "<!DOCTYPE html>\n"
           "<html><head>"
           "<link href=\"" edocs-stylesheet-location
           "\" rel=\"stylesheet\"></head><body>"))
 
-(defun edocs--insert-footer ()
+(defmethod edocs--export-insert-title ((exporter edocs-html-exporter)
+                                       title subtitle)
+  "Insert TITLE and SUBTITLE as html."
+  (edocs--with-tag "div" '(("class" . "container"))
+    (insert "<h1>" title " <small>&mdash; " subtitle "</small></h1>")))
+
+(defmethod edocs--export-insert-headers ((exporter edocs-ascii-exporter))
+  "Don't insert anything."
+  nil)
+
+(defmethod edocs--export-insert-title ((exporter edocs-ascii-exporter)
+                                       title subtitle)
+  "Insert TITLE and SUBTITLE."
+  (insert title " --- " subtitle "\n\n"))
+
+(defmethod edocs--export-insert-footer ((exporter edocs-html-exporter))
   "Insert necessary footer information into the current buffer."
   (insert "</body></html>"))
 
-(defun edocs--insert-title (title sub)
-  "Insert a formatted TITLE and SUB into the current buffer."
-  (insert "<h1>" title " <small>&mdash; " sub "</small></h1>"))
+(defmethod edocs--export-insert-footer ((exporter edocs-ascii-exporter))
+  "Don't insert anything."
+  nil)
 
 (defmacro edocs--with-tag (tag attrs &rest contents)
   "Put insertion of TAG (possibly with ATTRS) around CONTENTS."
@@ -177,7 +204,8 @@ etc."
        ,@contents
        (insert "</" ,tag-sym ">"))))
 
-(defun edocs--format-text (txt known-symbols)
+(defmethod edocs--export-format-text ((exporter edocs-html-exporter)
+                                      txt known-symbols)
   "Perform formatting operations on TXT.
 
 KNOWN-SYMBOLS is used for referencing symbols found in other
@@ -194,23 +222,41 @@ parts of the module."
       txt)
      'html t)))
 
-(defun edocs--format-commentary (cmt known-symbols)
-  "Perform special commentary formatting operations on CMT.
+(defmethod edocs--export-format-text ((exporter edocs-ascii-exporter)
+                                      txt known-symbols)
+  "Perform formatting operations on TXT."
+  txt)
+
+(defmethod edocs--export-insert-header ((exporter edocs-html-exporter)
+                                         level txt)
+  "Format a header."
+  (insert (format "<h%d>%s</h%d>" level txt level)))
+
+(defmethod edocs--export-insert-header ((exporter edocs-ascii-exporter)
+                                        level txt)
+  "Format a header"
+  (insert (make-string level ?=) " " txt "\n\n"))
+
+(defun edocs--format-commentary (exporter cmt known-symbols)
+  "Make EXPORTER perform special commentary formatting operations on CMT.
 
 KNOWN-SYMBOLS is used for referencing symbols found in other
 parts of the module."
-  (edocs--format-text
+  (edocs--export-format-text
+   exporter
    (replace-regexp-in-string
     ";" "*" (replace-regexp-in-string
              "^;; " "" (replace-regexp-in-string
                         ";;; Commentary:\n+" "" cmt))) known-symbols))
 
-(defun edocs--format-doc (doc known-symbols)
-  "Perform formatting operations on DOC or on DOC's `cdr'.
+(defun edocs--format-doc (exporter doc known-symbols)
+  "Make EXPORTER perform formatting operations on DOC or on DOC's `cdr'.
 
 KNOWN-SYMBOLS is used for referencing symbols found in other
 parts of the module."
-  (edocs--format-text (if (consp doc) (cdr doc) doc) known-symbols))
+  (edocs--export-format-text
+   exporter
+   (if (consp doc) (cdr doc) doc) known-symbols))
 
 (defun edocs--package-desc-p (package-info)
   "Check to see if PACKAGE-INFO is a package-desc struct."
@@ -244,8 +290,33 @@ See the docstring for `edocs--module-name' for more information."
       (list docs)
     docs))
 
-(defun edocs--format-symbol (symbol known-symbols)
-  "Format the information in SYMBOL.
+(defmethod edocs--export-insert-definition
+  ((exporter edocs-html-exporter) type name args doc known-symbols)
+  "Insert definition."
+  (edocs--with-tag "div" nil
+    (insert "&ndash; ")
+    (edocs--with-tag "strong" nil
+      (insert (edocs--get-type-display type)))
+    (insert ": ")
+    (edocs--with-tag "tt" nil
+      (edocs--with-tag "a" `(("name" . ,name)
+                             ("href" . ,(concat "#" name)))
+        (insert name)))
+    (insert " " (or args ""))
+    (edocs--with-tag "blockquote" '(("class" . "docstring"))
+      (insert (or (edocs--format-doc exporter doc known-symbols)
+                  "Not documented.")))))
+
+(defmethod edocs--export-insert-definition
+  ((exporter edocs-ascii-exporter) type name args doc known-symbols)
+  "Insert definition."
+  (insert "-- " (edocs--get-type-display type) ": "
+          name " " (or args "") "\n\n"
+          (or (edocs--format-doc exporter doc known-symbols)
+              "Not documented.") "\n\n"))
+
+(defun edocs--format-symbol (exporter symbol known-symbols)
+  "Make EXPORTER format the information in SYMBOL.
 
 KNOWN-SYMBOLS is used for referencing symbols found in other
 parts of the module."
@@ -254,22 +325,11 @@ parts of the module."
         (docs (edocs-symbol-doc symbol))
         (args (edocs-symbol-args symbol)))
     (mapc (lambda (doc)
-            (edocs--with-tag "div" nil
-              (insert "&ndash; ")
-              (edocs--with-tag "strong" nil
-                (insert (edocs--get-type-display type)))
-              (insert ": ")
-              (edocs--with-tag "tt" nil
-                (edocs--with-tag "a" `(("name" . ,name)
-                                       ("href" . ,(concat "#" name)))
-                  (insert name)))
-              (insert " " (or args ""))
-              (edocs--with-tag "blockquote" '(("class" . "docstring"))
-                (insert (or (edocs--format-doc doc known-symbols)
-                            "Not documented.")))))
+            (edocs--export-insert-definition
+             exporter type name args doc known-symbols))
           (edocs--normalize docs))))
 
-(defun edocs-generate ()
+(defun edocs-generate (&optional exporter)
   "Generate nice-looking documentation for a module or file.
 
 Markup is handled by `org-mode' exporting functions.  This
@@ -282,25 +342,29 @@ into a buffer called `*edocs*' and switches to that buffer."
          (binfo (package-buffer-info))
          (commentary (lm-commentary))
          (symbol-specs (edocs--list-symbols))
-         (symbols (mapcar #'edocs-symbol-name symbol-specs)))
+         (symbols (mapcar #'edocs-symbol-name symbol-specs))
+         (exporter (or exporter (make-instance edocs-exporter))))
     (with-current-buffer buffer
-      (unless edocs-generate-only-body (edocs--insert-header))
-      (edocs--with-tag "div" '(("class" . "container"))
-        (edocs--insert-title (edocs--module-name binfo)
-                             (edocs--module-summary binfo))
-        (insert (edocs--format-commentary commentary symbols))
-        (insert "<h2>API</h2>")
-        (mapc (lambda (spec) (edocs--format-symbol spec symbols))
-              symbol-specs))
       (unless edocs-generate-only-body
-        (edocs--insert-footer)))
+        (edocs--export-insert-headers exporter))
+      (edocs--export-insert-title exporter
+                                  (edocs--module-name binfo)
+                                  (edocs--module-summary binfo))
+      (insert (edocs--format-commentary exporter commentary symbols))
+      (edocs--export-insert-header exporter 2 "API")
+      (mapc (lambda (spec) (edocs--format-symbol exporter spec symbols))
+            symbol-specs)
+      (unless edocs-generate-only-body
+        (edocs--export-insert-footer exporter)))
     (switch-to-buffer buffer)))
 
 (defun edocs--generate-batch-1 (file)
   "Generate docs for FILE."
-  (with-current-buffer (find-file file)
-    (edocs-generate)
-    (write-file (concat (file-name-sans-extension file) ".html"))))
+  (let ((exporter (make-instance edocs-exporter)))
+    (with-current-buffer (find-file file)
+      (edocs-generate )
+      (write-file (concat (file-name-sans-extension file)
+                          (exporter-extension exporter))))))
 
 (defun edocs-generate-batch ()
   "Generate module docs as a batch operation.
