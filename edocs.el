@@ -228,9 +228,10 @@ parts of the module."
   txt)
 
 (defmethod edocs--export-insert-header ((exporter edocs-html-exporter)
-                                         level txt)
+                                        level txt)
   "Format a header."
-  (insert (format "<h%d>%s</h%d>" level txt level)))
+  (edocs--with-tag "div" '(("class" . "container"))
+    (insert (format "<h%d>%s</h%d>" level txt level))))
 
 (defmethod edocs--export-insert-header ((exporter edocs-ascii-exporter)
                                         level txt)
