@@ -227,7 +227,7 @@ parts of the module."
 (defmethod edocs--export-format-text ((exporter edocs-ascii-exporter)
                                       txt known-symbols)
   "Perform formatting operations on TXT."
-  txt)
+  (insert txt))
 
 (defmethod edocs--export-insert-header ((exporter edocs-html-exporter)
                                         level txt)
@@ -314,8 +314,7 @@ See the docstring for `edocs--module-name' for more information."
   "Insert definition."
   (insert "-- " (edocs--get-type-display type) ": "
           name " " (or args "") "\n\n"
-          (or (edocs--format-doc exporter doc known-symbols)
-              "Not documented.") "\n\n"))
+          (edocs--format-doc exporter doc known-symbols) "\n\n"))
 
 (defun edocs--format-symbol (exporter symbol known-symbols)
   "Make EXPORTER format the information in SYMBOL.
