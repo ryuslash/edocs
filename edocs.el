@@ -307,8 +307,7 @@ See the docstring for `edocs--module-name' for more information."
         (insert name)))
     (insert " " (or args ""))
     (edocs--with-tag "blockquote" '(("class" . "docstring"))
-      (insert (or (edocs--format-doc exporter doc known-symbols)
-                  "Not documented.")))))
+      (edocs--format-doc exporter doc known-symbols))))
 
 (defmethod edocs--export-insert-definition
   ((exporter edocs-ascii-exporter) type name args doc known-symbols)
